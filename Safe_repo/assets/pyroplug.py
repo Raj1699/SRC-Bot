@@ -360,7 +360,7 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
             if msg.media == MessageMediaType.POLL:
                 await client.edit_message_text(sender, edit_id, 'poll media cant be saved')
                 return 
-            edit = await client.edit_message_text(sender, edit_id, "__**Trying to Download**...")t.me/src_goku
+            edit = await client.edit_message_text(sender, edit_id, "__**Trying to Download**...")
             file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Unrestricting__: __[Goku ❤️](https://t.me/src_goku)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@Safe_repo' otherwise
             if not file:
               await client.send_message(sender, "Failed to download the media.")
