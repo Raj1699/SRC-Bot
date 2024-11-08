@@ -8,8 +8,7 @@ import re
 import logging
 import pymongo
 import sys
-from pyrogram.types import Message
-from mutagen.easyid3 import EasyID3
+from pyrogram.types import Message
 import math
 import os
 import yt_dlp
