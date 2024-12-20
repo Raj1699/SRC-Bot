@@ -15,31 +15,29 @@ import subprocess
 import logging
 from config import MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID
 
-
-
 async def copy_message_with_chat_id(client, sender, chat_id, message_id):
     # Get the user's set chat ID, if available; otherwise, use the original sender ID
     target_chat_id = user_chat_ids.get(sender, sender)
-    
+
     try:
         # Fetch the message using get_message
         msg = await client.get_messages(chat_id, message_id)
-        
+
         # Modify the caption based on user's custom caption preference
         custom_caption = get_user_caption_preference(sender)
         original_caption = msg.caption if msg.caption else ''
         final_caption = f"{original_caption}" if custom_caption else f"{original_caption}"
-        
+
         delete_words = load_delete_words(sender)
         for word in delete_words:
             final_caption = final_caption.replace(word, '  ')
-        
+
         replacements = load_replacement_words(sender)
         for word, replace_word in replacements.items():
             final_caption = final_caption.replace(word, replace_word)
-        
+
         caption = f"{final_caption}\n\n__**{custom_caption}**__" if custom_caption else f"{final_caption}"
-        
+
         if msg.media:
             if msg.media == MessageMediaType.VIDEO:
                 result = await client.send_video(target_chat_id, msg.video.file_id, caption=caption)
@@ -61,7 +59,7 @@ async def copy_message_with_chat_id(client, sender, chat_id, message_id):
             pass
 
         # Pin the message if it was originally pinned
-        if msg.pinned_message_message:
+        if msg.pinned_message: # Added check for msg.pinned_message
             try:
                 await result.pin(both_sides=True)
             except Exception as e:
@@ -81,13 +79,13 @@ async def send_message_with_chat_id(client, sender, message, is_pinned, parse_mo
           await result.copy(LOG_GROUP)
         except Exception:
           pass
-            
+
         if is_pinned:
             try:
                 await result.pin(both_sides=True)
             except Exception as e:
                 await result.pin()
-                
+
     except Exception as e:
         error_message = f"Error occurred while sending message to chat ID {chat_id}: {str(e)}"
         await client.send_message(sender, error_message)
@@ -118,13 +116,13 @@ async def send_video_with_chat_id(client, sender, path, caption, duration, hi, w
           await result.copy(LOG_GROUP)
         except Exception:
           pass
-            
+
         if is_pinned:
             try:
                 await result.pin(both_sides=True)
             except Exception as e:
                 await result.pin()
-                
+
     except Exception as e:
         error_message = f"Error occurred while sending video to chat ID {chat_id}: {str(e)}"
         await client.send_message(sender, error_message)
@@ -152,13 +150,13 @@ async def send_document_with_chat_id(client, sender, path, caption, thumb_path, 
           await result.copy(LOG_GROUP)
         except Exception:
           pass
-            
+
         if is_pinned:
             try:
                 await result.pin(both_sides=True)
             except Exception as e:
                 await result.pin()
-                
+
     except Exception as e:
         error_message = f"Error occurred while sending document to chat ID {chat_id}: {str(e)}"
         await client.send_message(sender, error_message)
