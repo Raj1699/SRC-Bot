@@ -196,6 +196,7 @@ def get_youtube_video_info(url, cookies_path="youtube_cookies.json"):
           return {
               'title': info_dict.get('title', 'Unknown Title'),
               'duration': info_dict.get('duration', 0),  # Duration in seconds
+              'description':info_dict.get('description', '')
           }
     except Exception as e:
         logger.error(f"Error fetching video info: {e}")
@@ -221,6 +222,36 @@ def video_metadata(file):
         return {'width': 0, 'height': 0, 'duration': 0}
 
 
+# Function to extract recipe from description
+def extract_recipe(description):
+    if not description:
+      return None
+
+    # Basic regex to find ingredients and instructions
+    ingredients_match = re.search(r"(ingredients|what you'll need|you will need):[\s\n]*(.*?)(?=instructions|method|how to cook|steps|procedure|$)", description, re.IGNORECASE | re.DOTALL)
+    instructions_match = re.search(r"(instructions|method|how to cook|steps|procedure):[\s\n]*(.*)", description, re.IGNORECASE | re.DOTALL)
+
+    ingredients = ""
+    instructions = ""
+
+    if ingredients_match:
+        ingredients = ingredients_match.group(2).strip()
+        # Split and clean each ingredient line
+        ingredients = "\n".join([i.strip() for i in ingredients.split("\n") if i.strip() and not re.match(r"^[-–—•]$", i.strip())])
+
+    if instructions_match:
+       instructions = instructions_match.group(2).strip()
+       instructions = "\n".join([i.strip() for i in instructions.split("\n") if i.strip() and not re.match(r"^[-–—•]$", i.strip())])
+
+    if ingredients or instructions:
+        return {
+            'ingredients': ingredients,
+            'instructions': instructions
+        }
+    else:
+      return None
+
+
 @app.on_message(filters.command("dl", prefixes="/"))
 async def youtube_dl_command(_, message):
     # Check if the command has an argument (YouTube URL)
@@ -241,6 +272,11 @@ async def youtube_dl_command(_, message):
             if video_info['duration'] > 10800:
                 await progress_message.edit_text("Video duration exceeds 3 hours. Not allowed.")
                 return
+            
+            # Extract Recipe
+            recipe = extract_recipe(video_info.get('description', ''))
+            if recipe:
+              await progress_message.reply(f"__Recipe:__\n\n__**Ingredients:**__\n{recipe.get('ingredients')}\n\n__**Instructions:**__\n{recipe.get('instructions')}")
 
             # Send buttons for quality selection
             buttons = [
@@ -355,6 +391,7 @@ async def youtube_dl_callback(_, query):
     except Exception as e:
         logger.error(f"Error during callback: {e}")
         await progress_message.edit_text(f"An error occurred: {str(e)}")
+
 
 def video_metadata(file):
     vcap = cv2.VideoCapture(f'{file}')
