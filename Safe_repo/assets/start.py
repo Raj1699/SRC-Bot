@@ -93,7 +93,7 @@ async def get_registered_users_command(event):
     # Check if the command is initiated by the owner
     if event.sender_id != OWNER_ID:
         return await event.respond("You are not authorized to use this command.")
-    
+
     # Get all registered user IDs and first names
     registered_users = get_registered_users()
 
@@ -182,23 +182,51 @@ def thumbnail(chat_id):
     return f'{chat_id}.jpg' if os.path.exists(f'{chat_id}.jpg') else f'thumb.jpg'
 
 # Function to get video info including duration
-def get_youtube_video_info(url):
+def get_youtube_video_info(url, cookies_path="youtube_cookies.json"):
     ydl_opts = {'quiet': True, 'skip_download': True}
-    with YoutubeDL(ydl_opts) as ydl:
-        info_dict = ydl.extract_info(url, download=False)
-        if not info_dict:
-            return None
-        return {
-            'title': info_dict.get('title', 'Unknown Title'),
-            'duration': info_dict.get('duration', 0),  # Duration in seconds
-        }
+    try:
+      if os.path.exists(cookies_path):
+        with open(cookies_path, "r") as f:
+          cookies = json.load(f)
+          ydl_opts['cookies'] = cookies
+      with YoutubeDL(ydl_opts) as ydl:
+          info_dict = ydl.extract_info(url, download=False)
+          if not info_dict:
+              return None
+          return {
+              'title': info_dict.get('title', 'Unknown Title'),
+              'duration': info_dict.get('duration', 0),  # Duration in seconds
+          }
+    except Exception as e:
+        logger.error(f"Error fetching video info: {e}")
+        return None
+
+def video_metadata(file):
+    try:
+        vcap = cv2.VideoCapture(f'{file}')
+        if not vcap.isOpened():
+            logger.error(f"Error: Could not open video file {file} for metadata extraction.")
+            return {'width': 0, 'height': 0, 'duration': 0}
+
+        width = round(vcap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = round(vcap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = vcap.get(cv2.CAP_PROP_FPS)
+        frame_count = vcap.get(cv2.CAP_PROP_FRAME_COUNT)
+        duration = round(frame_count / fps)
+
+        vcap.release()  # Release the video capture
+        return {'width': width, 'height': height, 'duration': duration}
+    except Exception as e:
+        logger.error(f"Error getting video metadata from {file}: {e}")
+        return {'width': 0, 'height': 0, 'duration': 0}
+
 
 @app.on_message(filters.command("dl", prefixes="/"))
 async def youtube_dl_command(_, message):
     # Check if the command has an argument (YouTube URL)
     if len(message.command) > 1:
         youtube_url = message.command[1]
-        
+
         # Send initial message indicating downloading
         progress_message = await message.reply("Fetching video info...")
 
@@ -213,133 +241,120 @@ async def youtube_dl_command(_, message):
             if video_info['duration'] > 10800:
                 await progress_message.edit_text("Video duration exceeds 3 hours. Not allowed.")
                 return
-            
+
             # Send buttons for quality selection
             buttons = [
               [Button.inline("Best Quality", data=f"dl_best_{youtube_url}"),
                Button.inline("Medium Quality", data=f"dl_medium_{youtube_url}")],
               [Button.inline("Low Quality", data=f"dl_low_{youtube_url}")]
            ]
-            
+
             await progress_message.edit_text("Choose quality:", buttons=buttons)
 
         except Exception as e:
+            logger.error(f"Error during /dl command: {e}")
             await progress_message.edit_text(f"An error occurred: {str(e)}")
 
     else:
         await message.reply("Please provide a YouTube URL after /dl.")
+
 
 @app.on_callback_query(filters.regex("^dl_(best|medium|low)_"))
 async def youtube_dl_callback(_, query):
     quality, youtube_url = query.data.split('_', 2)[1:]
-    
+
     # Send initial message indicating downloading
     progress_message = await query.message.edit_text(f"Downloading video in {quality} quality...")
-    
+
     try:
-          # Fetch video info using yt-dlp
-            video_info = get_youtube_video_info(youtube_url)
-            if not video_info:
-                await progress_message.edit_text("Failed to fetch video info.")
+        # Fetch video info using yt-dlp
+        video_info = get_youtube_video_info(youtube_url)
+        if not video_info:
+            await progress_message.edit_text("Failed to fetch video info.")
+            return
+
+        # Check if video duration is greater than 3 hours (10800 seconds)
+        if video_info['duration'] > 10800:
+            await progress_message.edit_text("Video duration exceeds 3 hours. Not allowed.")
+            return
+
+        # Safe file naming
+        original_file = f"{video_info['title'].replace('/', '_').replace(':', '_')}.mp4"
+        thumbnail_path = f"{video_info['title'].replace('/', '_').replace(':', '_')}.jpg"
+
+        # Define download format based on quality
+        if quality == 'best':
+            download_format = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+        elif quality == 'medium':
+            download_format = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]"
+        else:  # Low quality
+            download_format = "bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[height<=360]"
+
+        # Download video
+        ydl_opts = {
+            'format': download_format,
+            'outtmpl': original_file,
+            'noplaylist': True,
+            'quiet':True
+        }
+        try:
+            with open("youtube_cookies.json", "r") as f:
+                cookies = json.load(f)
+            ydl_opts['cookies'] = cookies
+        except FileNotFoundError:
+              await progress_message.edit_text("`youtube_cookies.json` not found. Please create it. See /help for more.")
+              return
+
+        with YoutubeDL(ydl_opts) as ydl:
+            try:
+                ydl.download([youtube_url])
+            except yt_dlp.utils.DownloadError as e:
+                if "Sign in to confirm you're not a bot" in str(e):
+                   await progress_message.edit_text("`yt-dlp` failed. Please update the cookie. See /help for more.")
+                   return
+                else:
+                    logger.error(f"yt-dlp DownloadError: {e}")
+                    await progress_message.edit_text(f"Failed to download the video.  {e}")
+                    return
+            except Exception as e:
+                logger.error(f"yt-dlp error during download: {e}")
+                await progress_message.edit_text(f"Failed to download the video due to {e}")
                 return
 
-            # Check if video duration is greater than 3 hours (10800 seconds)
-            if video_info['duration'] > 10800:
-                await progress_message.edit_text("Video duration exceeds 3 hours. Not allowed.")
-                return
+        # Check if the original file exists before renaming
+        if not os.path.exists(original_file):
+             await progress_message.edit_text("Failed to download video.")
+             return
 
-            # Safe file naming
-            original_file = f"{video_info['title'].replace('/', '_').replace(':', '_')}.mp4"
-            thumbnail_path = f"{video_info['title'].replace('/', '_').replace(':', '_')}.jpg"
+        # Edit the progress message to indicate uploading
+        await progress_message.edit_text("Uploading video...")
 
-            # Define download format based on quality
-            if quality == 'best':
-              download_format = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-            elif quality == 'medium':
-              download_format = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]"
-            else:  # Low quality
-              download_format = "bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[height<=360]"
+        # Get video metadata
+        metadata = video_metadata(original_file)
+        caption = f"{video_info['title']}\n\n__**Powered by [SRC Bot](https://t.me/src_goku)**__"  # Set caption to the title of the video
 
-            # Download video
-            ydl_opts = {
-                'format': download_format,
-                'outtmpl': original_file,  # Output file template
-                'noplaylist': True,  # Disable downloading playlists
-            }
+        # Send the video file and thumbnail
+        safe_repo_bot = query.message.chat.id
+        k = thumbnail(safe_repo_bot)
+        result = await app.send_video(
+            chat_id=query.message.chat.id,
+            video=original_file,
+            caption=caption,
+            thumb=k,
+            width=metadata['width'],
+            height=metadata['height'],
+            duration=metadata['duration'],
+        )
+        await result.copy(LOG_GROUP)
 
-            with YoutubeDL(ydl_opts) as ydl:
-                ydl.download([youtube_url])  # Start downloading the video
+        os.remove(original_file)
 
-            # Check if the original file exists before renaming
-            if not os.path.exists(original_file):
-                await progress_message.edit_text("Failed to download video.")
-                return
-
-            # Edit the progress message to indicate uploading
-            await progress_message.edit_text("Uploading video...")
-
-            # Get video metadata
-            metadata = video_metadata(original_file)
-            caption = f"{video_info['title']}\n\n__**Powered by [SRC Bot](https://t.me/src_goku)**__"  # Set caption to the title of the video
-            
-            # Send the video file and thumbnail
-            safe_repo_bot = query.message.chat.id
-            k = thumbnail(safe_repo_bot)
-            result = await app.send_video(
-                chat_id=query.message.chat.id,
-                video=original_file,
-                caption=caption,
-                thumb=k,
-                width=metadata['width'],
-                height=metadata['height'],
-                duration=metadata['duration'],
-            )
-            await result.copy(LOG_GROUP)
-
-            os.remove(original_file)
-
-            # Delete the progress message after sending video
-            await progress_message.delete()
+        # Delete the progress message after sending video
+        await progress_message.delete()
 
     except Exception as e:
-      await progress_message.edit_text(f"An error occurred: {str(e)}")
-
-
-def video_metadata(file):
-    vcap = cv2.VideoCapture(f'{file}')
-    width = round(vcap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = round(vcap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = vcap.get(cv2.CAP_PROP_FPS)
-    frame_count = vcap.get(cv2.CAP_PROP_FRAME_COUNT)
-    duration = round(frame_count / fps)
-    return {'width': width, 'height': height, 'duration': duration} video metadata
-            metadata = video_metadata(original_file)
-            caption = f"{video_info['title']}\n\n__**Powered by [SRC Bot](https://t.me/src_goku)**__"  # Set caption to the title of the video
-            
-            # Send the video file and thumbnail
-            safe_repo_bot = message.chat.id
-            k = thumbnail(safe_repo_bot)
-            result = await app.send_video(
-                chat_id=message.chat.id,
-                video=original_file,
-                caption=caption,
-                thumb=k,
-                width=metadata['width'],
-                height=metadata['height'],
-                duration=metadata['duration'],
-            )
-            await result.copy(LOG_GROUP)
-
-            os.remove(original_file)
-
-            # Delete the progress message after sending video
-            await progress_message.delete()
-
-        except Exception as e:
-            await progress_message.edit_text(f"An error occurred: {str(e)}")
-
-    else:
-        await message.reply("Please provide a YouTube URL after /dl.")
+        logger.error(f"Error during callback: {e}")
+        await progress_message.edit_text(f"An error occurred: {str(e)}")
 
 def video_metadata(file):
     vcap = cv2.VideoCapture(f'{file}')
