@@ -1,8 +1,7 @@
-
 import sys
 from pyrogram import Client
 from telethon.sync import TelegramClient
-from config import API_ID, API_HASH, BOT_TOKEN, DEFAULT_SESSION
+from config import API_ID, API_HASH, BOT_TOKEN
 
 # Initialize uvloop if you plan to use it
 # import uvloop
@@ -50,20 +49,21 @@ def start_telethon_client(name, api_id, api_hash, bot_token=None):
 
 
 # Function to start the defaultbot using session string
-def start_defaultbot(session_string, api_id, api_hash):
+def start_defaultbot(bot_token, api_id, api_hash, device):
     try:
         client = Client(
             "defaultbot",
+            bot_token=bot_token,
             api_id=int(api_id),
             api_hash=api_hash,
-            session_string=session_string
+            device_model=device
         )
         client.start()
         return client
     except Exception as e:
         print(f"Error starting defaultbot: {e}")
         sys.exit(1)
-        
+
 # Start all clients
 def start_all_clients():
     global Bot, modi, sigma, defaultbot, bot  # Access global variables
@@ -72,11 +72,10 @@ def start_all_clients():
     Bot = start_pyrogram_client("clientone", BOT_TOKEN, API_ID, API_HASH, device, 20)
     modi = start_pyrogram_client("modiji", BOT_TOKEN, API_ID, API_HASH, device, 10)
     sigma = start_pyrogram_client("sigma", BOT_TOKEN, API_ID, API_HASH, device, 10)
-    defaultbot = start_defaultbot(DEFAULT_SESSION, API_ID, API_HASH)
+    defaultbot = start_defaultbot(BOT_TOKEN, API_ID, API_HASH, device)
 
     # Start Telethon clients
     bot = start_telethon_client('sexypne', API_ID, API_HASH, BOT_TOKEN)
 
 # Initialize clients when the module is imported
 start_all_clients()
-        
