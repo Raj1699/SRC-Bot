@@ -11,4 +11,4 @@ WORKDIR /app
 COPY . .
 EXPOSE 8000
 
-CMD flask run -h 0.0.0.0 -p 8000 & python3 -m devgagan
+CMD flask run -h 0.0.0.0 -p 8000 & python3 -m Safe_repo
