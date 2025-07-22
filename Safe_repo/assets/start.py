@@ -315,8 +315,8 @@ async def youtube_dl_callback(_, query):
             return
 
         # Safe file naming
-        original_file = f"{video_info['title'].replace('/', '_').replace(':', '_')}.mp4"
-        thumbnail_path = f"{video_info['title'].replace('/', '_').replace(':', '_')}.jpg"
+        original_file = f"{video_info['title'].replace('/', '_').replace(':', ' ')}.mp4"
+        thumbnail_path = f"{video_info['title'].replace('/', '_').replace(':', ' ')}.jpg"
 
         # Define download format based on quality
         if quality == 'best':
