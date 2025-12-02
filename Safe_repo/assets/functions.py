@@ -1,12 +1,9 @@
 #Github.com/Safe-repo
 
 from pyrogram.errors import FloodWait, InviteHashInvalid, InviteHashExpired, UserAlreadyParticipant
-from telethon import errors, events
 
-import asyncio, subprocess, re, os, time
-from pathlib import Path
+import asyncio, re, os, time
 from datetime import datetime as dt
-import math
 import cv2
 
 from telethon.errors.rpcerrorlist import UserNotParticipantError
@@ -14,12 +11,8 @@ from telethon.tl.functions.channels import GetParticipantRequest
 
 import logging
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Logger is already configured in __main__
 logger = logging.getLogger(__name__)
-logging.getLogger("pyrogram").setLevel(logging.WARNING)
-logging.getLogger("telethon").setLevel(logging.WARNING)
-
 
 # Function to get width, height, and duration (in seconds) of a video
 def video_metadata(file):
@@ -48,6 +41,9 @@ def video_metadata(file):
         print(f"Error in video_metadata: {e}")
         return default_values  # Return defaults in case of any exception
 
+def thumbnail(chat_id):
+    return f'{chat_id}.jpg' if os.path.exists(f'{chat_id}.jpg') else f'thumb.jpg'
+
 #Join private chat-------------------------------------------------------------------------------------------------------------
 
 async def join(client, invite_link):
@@ -63,9 +59,9 @@ async def join(client, invite_link):
     except Exception as e:
         print(e)
         return f"{e} \nCould not join, try joining manually."
-    
-    
-    
+
+
+
 #----------------------------------
 async def force_sub(client, channel, id, ft):
     s, r = False, None
@@ -119,7 +115,7 @@ def get_link(string):
         return link if (link := [x[0] for x in url][0]) else False
     except Exception:
         return False
-    
+
 #Screenshot---------------------------------------------------------------------------------------------------------------
 
 def hhmmss(seconds):
@@ -132,11 +128,11 @@ async def screenshot(video, duration, sender):
     out = dt.now().isoformat("_", "seconds") + ".jpg"
     cmd = ["ffmpeg",
            "-ss",
-           f"{time_stamp}", 
+           f"{time_stamp}",
            "-i",
            f"{video}",
            "-frames:v",
-           "1", 
+           "1",
            f"{out}",
            "-y"
           ]
@@ -151,4 +147,4 @@ async def screenshot(video, duration, sender):
     if os.path.isfile(out):
         return out
     else:
-        None       
+        None

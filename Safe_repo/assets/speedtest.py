@@ -2,7 +2,6 @@
 
 from time import time
 from speedtest import Speedtest
-import math
 from Safe_repo.__main__ import botStartTime
 from telethon import events
 from .. import bot as Safe_repo
@@ -73,7 +72,7 @@ async def speedtest(event):
 ├ <b>Country:</b> <code>{result['client']['country']}</code>
 ├ <b>ISP:</b> <code>{result['client']['isp']}</code>
 ├ <b>ISP Rating:</b> <code>{result['client']['isprating']}</code>
-╰ <b>Powered by Goku ❤️</b> 
+╰ <b>Powered by Goku ❤️</b>
 '''
     try:
         await event.reply(string_speed,file=path,parse_mode='html')

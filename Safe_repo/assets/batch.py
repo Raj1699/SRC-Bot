@@ -7,51 +7,53 @@ from .. import defaultbot
 from .. import Bot
 from telethon import events, Button, errors
 from pyrogram.errors import FloodWait
-from Safe_repo.assets.pyroplug import get_msg, check, get_bulk_msg
-from Safe_repo.assets.functions import get_link, join, screenshot, force_sub
+from Safe_repo.assets.pyroplug import check, get_bulk_msg
+from Safe_repo.assets.functions import get_link
 from Safe_repo.assets.login import get_session
-import logging
 import asyncio
-import pymongo
-from telethon.tl.types import DocumentAttributeVideo
 from pyrogram import Client 
-from config import API_ID, API_HASH
+from config import API_ID, API_HASH, MONGODB_CONNECTION_STRING
+import pymongo
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Logger is already configured in __main__
 logger = logging.getLogger(__name__)
-logging.getLogger("pyrogram").setLevel(logging.WARNING)
-logging.getLogger("telethon").setLevel(logging.WARNING)
 
-
+# MongoDB Connection
+mongo_client = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
+db = mongo_client["batch_data_db"]
+batch_collection = db["batch_data"]
+ids_collection = db["ids_data"]
 
 # --------------------- BATCH BEGINS ------------------ 
 
-def save_batch_data(batch_data):
-    with open("batch_data.json", "w") as f:
-        json.dump(batch_data, f)
+def save_batch_data(user_id, status):
+    batch_collection.update_one(
+        {"user_id": str(user_id)},
+        {"$set": {"status": status}},
+        upsert=True
+    )
 
-def load_batch_data():
-    if os.path.exists("batch_data.json"):
-        with open("batch_data.json", "r") as f:
-            return json.load(f)
-    else:
-        return {}
+def load_batch_data(user_id):
+    data = batch_collection.find_one({"user_id": str(user_id)})
+    return data["status"] if data else False
 
-batch_data = load_batch_data()
+def delete_batch_data(user_id):
+    batch_collection.delete_one({"user_id": str(user_id)})
 
-def save_ids_data(ids_data):
-    with open("ids_data.json", "w") as f:
-        json.dump(ids_data, f)
+def save_ids_data(user_id, ids_list):
+    ids_collection.update_one(
+        {"user_id": str(user_id)},
+        {"$set": {"ids_list": ids_list}},
+        upsert=True
+    )
 
-def load_ids_data():
-    if os.path.exists("ids_data.json"):
-        with open("ids_data.json", "r") as f:
-            return json.load(f)
-    else:
-        return {}
+def load_ids_data(user_id):
+    data = ids_collection.find_one({"user_id": str(user_id)})
+    return data["ids_list"] if data else []
 
-ids_data = load_ids_data()
+def delete_ids_data(user_id):
+    ids_collection.delete_one({"user_id": str(user_id)})
+
 
 @Safe_repo.on(events.NewMessage(incoming=True, pattern='/batch'))
 async def _batch(event):
@@ -69,7 +71,7 @@ async def _batch(event):
     else:
       userbot = defaultbot
 
-    if user_id in batch_data:
+    if load_batch_data(user_id):
         return await event.reply("You've already started one batch, wait for it to complete!")
 
     async with Safe_repo.conversation(event.chat_id) as conv: 
@@ -90,16 +92,14 @@ async def _batch(event):
             except ValueError:
                 return await conv.send_message("Range must be an integer!")
 
-            ids_data[str(user_id)] = list(range(value))
-            save_ids_data(ids_data)
+            save_ids_data(user_id, list(range(value)))
 
             s, r = await check(userbot, Bot, _link, event)
             if s != True:
                 await conv.send_message(r)
                 return
 
-            batch_data[str(user_id)] = True
-            save_batch_data(batch_data)
+            save_batch_data(user_id, True)
             
 
             cd = await conv.send_message("**Batch process ongoing...**\n\nProcess completed: ", 
@@ -113,10 +113,8 @@ async def _batch(event):
                 await Bot.send_message(user_id, "ERROR!\n\n maybe last msg didn't exist yet")
             finally:
                 conv.cancel()
-                del batch_data[str(user_id)]
-                save_batch_data(batch_data)
-                del ids_data[str(user_id)]
-                save_ids_data(ids_data)
+                delete_batch_data(user_id)
+                delete_ids_data(user_id)
         except Exception as e:
             logger.info(e)
             await conv.send_message("Processed")
@@ -124,16 +122,20 @@ async def _batch(event):
 @Safe_repo.on(events.NewMessage(incoming=True, pattern='/cancel'))
 async def cancel_command(event):
     user_id = event.sender_id
-    if str(user_id) in ids_data:
-        del ids_data[str(user_id)]
-        save_ids_data(ids_data)
+    if load_ids_data(user_id):
+        delete_ids_data(user_id)
         await event.respond("Operation canceled.")
     else:
         await event.respond("There is no operation to cancel.")
 
 
 async def run_batch(userbot, client, sender, countdown, link):
-    for i in range(len(ids_data[str(sender)])):
+    ids_list = load_ids_data(sender)
+    for i in range(len(ids_list)):
+        # Check if cancelled
+        if not load_ids_data(sender):
+             break
+
         timer = 15  # Increased default timer value
 
         if i < 250:
@@ -157,7 +159,7 @@ async def run_batch(userbot, client, sender, countdown, link):
 
         try: 
             count_down = f"**Batch process ongoing.**\n\nProcess completed: {i+1}"
-            integer = int(link.split("/")[-1]) + int(ids_data[str(sender)][i])
+            integer = int(link.split("/")[-1]) + int(ids_list[i])
             await get_bulk_msg(userbot, client, sender, link, integer)
             protection = await client.send_message(sender, f"Sleeping for `{timer}` seconds to avoid Floodwaits and Protect account!")
             await countdown.edit(count_down, 
@@ -171,7 +173,7 @@ async def run_batch(userbot, client, sender, countdown, link):
         except FloodWait as fw:
             if int(fw.value) > 300:
                 await client.send_message(sender, f'You have floodwaits of {fw.value} seconds, cancelling batch') 
-                ids_data.pop(str(sender))
+                delete_ids_data(sender)
                 break
             else:
                 fw_alert = await client.send_message(sender, f'Sleeping for {fw.value + 15} second(s) due to Telegram floodwait.')
@@ -190,5 +192,5 @@ async def run_batch(userbot, client, sender, countdown, link):
             if countdown.text != count_down:
                 await countdown.edit(count_down, buttons=[[Button.url("Join Channel", url="https://t.me/src_goku")]])
         n = i + 1
-        if n == len(ids_data[str(sender)]):
+        if n == len(ids_list):
             return -2
