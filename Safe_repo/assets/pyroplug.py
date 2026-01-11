@@ -5,13 +5,11 @@ from pyrogram.enums import ParseMode , MessageMediaType
 from .. import bot as Safe_repo
 from .. import Bot
 from Safe_repo.assets.progress import progress_for_pyrogram
-from Safe_repo.assets.functions import screenshot
+from Safe_repo.assets.functions import screenshot, video_metadata, thumbnail
 from pyrogram import Client
 from pyrogram.types import Message
 from pyrogram.errors import ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid
-from Safe_repo.assets.functions import video_metadata
 from telethon import events, Button
-import subprocess
 import logging
 from config import MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID
 
@@ -190,7 +188,7 @@ async def clear_all_delete_words_command_handler(event):
     # Check if the command is used by the owner
     if event.sender_id != OWNER_ID:
         return await event.respond("You are not authorized to use this command!")
-    
+
     try:
         # Clear all delete words from the database
         collection.delete_many({})
@@ -199,9 +197,6 @@ async def clear_all_delete_words_command_handler(event):
         print(f"Error clearing all delete words: {e}")
         await event.respond("An error occurred while clearing all delete words.")
 
-
-def thumbnail(sender):
-    return f'{sender}.jpg' if os.path.exists(f'{sender}.jpg') else None
 
 @Safe_repo.on(events.NewMessage(incoming=True, pattern='/unauth'))
 async def _unauth(event):
@@ -248,7 +243,7 @@ async def check(userbot, client, link, event):
             return False, "**Invalid Link!**"
         link_ = link.split("?single")[0]
         msg_id = int(link_.split("/")[-1])
-    
+
     if 't.me/c/' in link:
         try:
             chat = int('-100' + str(link.split("/")[-2]))
@@ -289,13 +284,13 @@ async def lock_command_handler(event):
     # Check if the command is initiated by the owner
     if event.sender_id != OWNER_ID:
         return await event.respond("You are not authorized to use this command.")
-    
+
     # Extract the channel ID from the command
     try:
         channel_id = int(event.text.split(' ')[1])
     except (ValueError, IndexError):
         return await event.respond("Invalid /lock command. Use /lock CHANNEL_ID.")
-    
+
     # Save the channel ID to the MongoDB database
     try:
         # Insert the channel ID into the collection
@@ -307,7 +302,7 @@ async def lock_command_handler(event):
 async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
     edit = ""
     chat = ""
-    msg_id = int(i)  
+    msg_id = int(i)
     if msg_id == -1:
         await client.edit_message_text(sender, edit_id, "**Invalid Link!**")
         return None
@@ -328,7 +323,7 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
                 return None
             if msg.empty is not None:
                 await client.delete_messages(chat_id=sender, message_ids=edit_id)
-                return None            
+                return None
             if msg.media and msg.media == MessageMediaType.WEB_PAGE:
                 a = b = True
                 edit = await client.edit_message_text(sender, edit_id, "Cloning.")
@@ -357,7 +352,7 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
                 return None
             if msg.media == MessageMediaType.POLL:
                 await client.edit_message_text(sender, edit_id, 'poll media cant be saved')
-                return 
+                return
             edit = await client.edit_message_text(sender, edit_id, "__**Trying to Download**...")
             file = await userbot.download_media(msg, progress=progress_for_pyrogram, progress_args=(client, "**__Unrestricting__: __[Goku ❤️](https://t.me/src_goku)__**\n ", edit, time.time()))            # Retrieve user's custom renaming preference if set, default to '@Safe_repo' otherwise
             if not file:
@@ -365,7 +360,7 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
               return None
             await edit.delete()
             custom_rename_tag = get_user_rename_preference(sender)
-            # retriving name 
+            # retriving name
             last_dot_index = str(file).rfind('.')
             if last_dot_index != -1 and last_dot_index != 0:
               original_file_name = str(file)[:last_dot_index]
@@ -373,28 +368,28 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
             else:
               original_file_name = str(file)
               file_extension = 'mp4'
-            
+
             #Removing Words
             delete_words = load_delete_words(sender)
             for word in delete_words:
               original_file_name = original_file_name.replace(word, "")
-            
+
             # Rename the file with the updated file name and custom renaming tag
             video_file_name = original_file_name + " " + custom_rename_tag
             new_file_name = video_file_name + "." + file_extension
             os.rename(file, new_file_name)
-            file = new_file_name  
+            file = new_file_name
 
             path = file
             upm = await client.send_message(sender, 'Preparing to Upload!')
-            
+
             caption = str(file)
             if msg.caption is not None:
                 caption = msg.caption
             if file_extension in ['mkv', 'mp4', 'webm', 'mpe4', 'mpeg', 'ts', 'avi', 'flv', 'org', 'm4v']:
                 if file_extension in ['webm', 'mkv', 'mpe4', 'mpeg', 'ts', 'avi', 'flv', 'org', 'm4v']:
                     path = video_file_name + ".mp4"
-                    os.rename(file, path) 
+                    os.rename(file, path)
                     file = path
                 data = video_metadata(file)
                 duration = data["duration"]
@@ -467,7 +462,7 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
                     final_caption = final_caption.replace(word, replace_word)
                 caption = f"{final_caption}\n\n__**{custom_caption}**__" if custom_caption else f"{final_caption}"
                 await send_document_with_chat_id(client, sender, path, caption, thumb_path, upm, msg.pinned_message)
-                    
+
             os.remove(file)
             await upm.delete()
             return None
@@ -480,11 +475,11 @@ async def get_msg(userbot, client, sender, edit_id, msg_link, i, file_n):
         await copy_message_with_chat_id(client, sender, chat, msg_id)
         await edit.delete()
         return None
-    
+
 async def get_bulk_msg(userbot, client, sender, msg_link, i):
     x = await client.send_message(sender, "Processing!")
     file_name = ''
-    await get_msg(userbot, client, sender, x.id, msg_link, i, file_name) 
+    await get_msg(userbot, client, sender, x.id, msg_link, i, file_name)
 
 
 
@@ -630,7 +625,7 @@ async def settings_command(event):
         [Button.inline("Set Thumbnail", b'setthumb'), Button.inline("Remove Thumbnail", b'remthumb')],
         [Button.url("Report Errors", "https://t.me/src_goku")]
     ]
-    
+
     await Safe_repo.send_message(
         event.chat_id,
         message=MESS,
@@ -666,13 +661,13 @@ async def callback_query_handler(event):
     elif event.data == b'delete':
         await event.respond("Send words seperated by space to delete them from caption/filename ...")
         sessions[user_id] = 'deleteword'
-        
+
     elif event.data == b'logout':
         result = mcollection.delete_one({"user_id": user_id})
         if result.deleted_count > 0:
           await event.respond("Logged out and deleted session successfully.")
         else:
-          await event.respond("You are not logged in")   
+          await event.respond("You are not logged in")
 
     elif event.data == b'setthumb':
         pending_photos[user_id] = True
@@ -717,12 +712,12 @@ async def handle_user_input(event):
                 await event.respond("Chat ID set successfully!")
             except ValueError:
                 await event.respond("Invalid chat ID!")
-        
+
         elif session_type == 'setrename':
             custom_rename_tag = event.text
             await set_rename_command(user_id, custom_rename_tag)
             await event.respond(f"Custom rename tag set to: {custom_rename_tag}")
-        
+
         elif session_type == 'setcaption':
             custom_caption = event.text
             await set_caption_command(user_id, custom_caption)
@@ -755,12 +750,12 @@ async def handle_user_input(event):
                 upsert=True
             )
             await event.respond("Session string added successfully.")
-                
+
         elif session_type == 'deleteword':
             words_to_delete = event.message.text.split()
             delete_words = load_delete_words(user_id)
             delete_words.update(words_to_delete)
             save_delete_words(user_id, delete_words)
-            await event.respond(f"Words added to delete list: {', '.join(words_to_delete)}")       
+            await event.respond(f"Words added to delete list: {', '.join(words_to_delete)}")
 
         del sessions[user_id]

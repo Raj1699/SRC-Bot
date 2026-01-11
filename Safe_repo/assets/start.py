@@ -3,10 +3,8 @@ from .. import bot as Safe_repo
 from telethon import events, Button
 from pyrogram import Client, filters
 from telethon.tl.types import DocumentAttributeVideo
-from multiprocessing import Process, Manager
 import re
 import logging
-import pymongo
 import sys
 from pyrogram.types import Message
 import math
@@ -20,11 +18,10 @@ import cv2
 from yt_dlp import YoutubeDL
 from telethon.sync import TelegramClient
 from .. import sigma as app
-from Safe_repo.assets.functions import screenshot
-import subprocess
+from Safe_repo.assets.functions import screenshot, video_metadata, thumbnail
 from config import MONGODB_CONNECTION_STRING, OWNER_ID, LOG_GROUP
 
-logging.basicConfig(level=logging.INFO)
+# Logger is already configured in __main__
 logger = logging.getLogger(__name__)
 
 DB_NAME = "start_users"
@@ -177,10 +174,6 @@ async def help_command(event):
     buttons = [[Button.url("REPO", url=REPO_URL)]]
     await event.respond(HELP_TEXT, buttons=buttons, link_preview=False)
 
-
-def thumbnail(chat_id):
-    return f'{chat_id}.jpg' if os.path.exists(f'{chat_id}.jpg') else f'thumb.jpg'
-
 # Function to get video info including duration
 def get_youtube_video_info(url, cookies_path="youtube_cookies.json"):
     ydl_opts = {'quiet': True, 'skip_download': True}
@@ -201,26 +194,6 @@ def get_youtube_video_info(url, cookies_path="youtube_cookies.json"):
     except Exception as e:
         logger.error(f"Error fetching video info: {e}")
         return None
-
-def video_metadata(file):
-    try:
-        vcap = cv2.VideoCapture(f'{file}')
-        if not vcap.isOpened():
-            logger.error(f"Error: Could not open video file {file} for metadata extraction.")
-            return {'width': 0, 'height': 0, 'duration': 0}
-
-        width = round(vcap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = round(vcap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = vcap.get(cv2.CAP_PROP_FPS)
-        frame_count = vcap.get(cv2.CAP_PROP_FRAME_COUNT)
-        duration = round(frame_count / fps)
-
-        vcap.release()  # Release the video capture
-        return {'width': width, 'height': height, 'duration': duration}
-    except Exception as e:
-        logger.error(f"Error getting video metadata from {file}: {e}")
-        return {'width': 0, 'height': 0, 'duration': 0}
-
 
 # Function to extract recipe from description
 def extract_recipe(description):
@@ -391,13 +364,3 @@ async def youtube_dl_callback(_, query):
     except Exception as e:
         logger.error(f"Error during callback: {e}")
         await progress_message.edit_text(f"An error occurred: {str(e)}")
-
-
-def video_metadata(file):
-    vcap = cv2.VideoCapture(f'{file}')
-    width = round(vcap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = round(vcap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = vcap.get(cv2.CAP_PROP_FPS)
-    frame_count = vcap.get(cv2.CAP_PROP_FRAME_COUNT)
-    duration = round(frame_count / fps)
-    return {'width': width, 'height': height, 'duration': duration}

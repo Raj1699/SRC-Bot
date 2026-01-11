@@ -3,10 +3,8 @@
 from .. import bot as safe_repo
 from telethon import events
 from Safe_repo.__main__ import botStartTime
-import random
 from psutil import disk_usage, cpu_percent, swap_memory, cpu_count, virtual_memory, net_io_counters, boot_time
 from time import time
-import requests
 from Safe_repo.assets.functions import TimeFormatter, humanbytes
 
 @safe_repo.on(events.NewMessage(incoming=True, func=lambda e: e.is_private, pattern='/stats'))
@@ -46,7 +44,5 @@ async def stats(event):
             f'Memory Free: {mem_a}\n'\
             f'Memory Used: {mem_u}\n\n'\
             f'**__Powered by Goku ❤️__**\n'
-    
+
     await event.reply(f"{stats}")
-
-

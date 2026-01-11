@@ -1,29 +1,20 @@
 # Safe-repo
 
 import time
-import os
 import logging
-import json
 from .. import bot as Safe_repo
 from .. import Bot , defaultbot
 from config import FORCESUB as fs
-from telethon import events, Button, errors
+from telethon import events
 from pyrogram.errors import FloodWait
-from Safe_repo.assets.pyroplug import get_msg, check, get_bulk_msg
-from Safe_repo.assets.functions import get_link, join, screenshot, force_sub
+from Safe_repo.assets.pyroplug import get_msg
+from Safe_repo.assets.functions import get_link, join, force_sub
 from Safe_repo.assets.login import get_session
-import logging
-import asyncio
-import pymongo
-from telethon.tl.types import DocumentAttributeVideo
-from pyrogram import Client 
+from pyrogram import Client
 from config import API_ID, API_HASH
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Logger is already configured in __main__
 logger = logging.getLogger(__name__)
-logging.getLogger("pyrogram").setLevel(logging.WARNING)
-logging.getLogger("telethon").setLevel(logging.WARNING)
 
 
 ft = f"To use this bot you've to join @{fs}."
@@ -125,9 +116,9 @@ async def clone(event):
                         return
                 else:
                   userbot = defaultbot
-                  
+
                 await get_msg(userbot, Bot, event.sender_id, edit.id, link, m, file_name)
-              
+
 
         except FloodWait as fw:
             await Safe_repo.send_message(event.sender_id, f'Try again after {fw.value} seconds due to floodwait from telegram.')

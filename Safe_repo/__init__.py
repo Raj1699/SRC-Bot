@@ -3,10 +3,6 @@ from pyrogram import Client
 from telethon.sync import TelegramClient
 from config import API_ID, API_HASH, BOT_TOKEN
 
-# Initialize uvloop if you plan to use it
-# import uvloop
-# uvloop.install()
-
 device = "Telegram Android 10.11.1"
 
 # Module-level variables for the clients

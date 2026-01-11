@@ -1,7 +1,5 @@
 import pymongo
-import os
 from .. import modi as app
-from .. import bot as Safe_repo
 from pyrogram import Client, filters
 from pyrogram.errors import (
     ApiIdInvalid,
@@ -11,8 +9,6 @@ from pyrogram.errors import (
     SessionPasswordNeeded,
     PasswordHashInvalid
 )
-import random
-import asyncio
 from config import API_ID as api_id, API_HASH as api_hash, MONGODB_CONNECTION_STRING
 
 DB_NAME = "logins"
